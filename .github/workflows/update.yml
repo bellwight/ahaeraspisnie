@@ -10,6 +10,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: schedule-update
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
@@ -37,5 +41,17 @@ jobs:
           git config user.name "schedule-bot"
           git config user.email "actions@users.noreply.github.com"
           git add docs/schedule.json docs/schedule.ics
-          git diff --cached --quiet || git commit -m "Auto-update schedule"
-          git push
+          if git diff --cached --quiet; then
+            echo "Нет изменений"
+            exit 0
+          fi
+          git commit -m "Auto-update schedule"
+          for i in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push отклонён, подтягиваю свежие изменения и пробую снова..."
+            git fetch origin main
+            git rebase origin/main
+          done
+          exit 1
